@@ -1,0 +1,365 @@
+import 'package:material_ui/material_ui.dart';
+import 'package:provider/provider.dart';
+
+import '../models/user.dart';
+import '../providers/auth_provider.dart';
+import '../providers/theme_provider.dart';
+import '../services/api_service.dart';
+import '../theme/app_theme.dart';
+import 'dossiers_screen.dart';
+import 'documents_screen.dart';
+import 'publications_screen.dart';
+import 'users_screen.dart';
+import 'profile_screen.dart';
+import 'login_screen.dart';
+
+class DashboardScreen extends StatefulWidget {
+  const DashboardScreen({super.key});
+
+  @override
+  State<DashboardScreen> createState() => _DashboardScreenState();
+}
+
+class _DashboardScreenState extends State<DashboardScreen> {
+  int _selectedIndex = 0;
+  final ApiService _api = ApiService();
+
+  // Statistiques
+  bool _isStatsLoading = true;
+  int _dossiersCount = 0;
+  int _documentsCount = 0;
+  int _publicationsCount = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadStats();
+  }
+
+  Future<void> _loadStats() async {
+    final auth = context.read<AuthProvider>();
+    if (auth.user == null) return;
+
+    setState(() => _isStatsLoading = true);
+
+    try {
+      final pubs = await _api.listPublications();
+      
+      int dossiers = 0;
+      int documents = 0;
+      
+      if (!auth.isTechnicien) {
+        final dossiersList = await _api.listDossiers();
+        final documentsList = await _api.listMyDocuments();
+        dossiers = dossiersList.length;
+        documents = documentsList.length;
+      }
+
+      if (mounted) {
+        setState(() {
+          _publicationsCount = pubs.length;
+          _dossiersCount = dossiers;
+          _documentsCount = documents;
+          _isStatsLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _isStatsLoading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final auth = context.watch<AuthProvider>();
+    final user = auth.user;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    if (user == null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const LoginScreen()),
+          (route) => false,
+        );
+      });
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('TeamKarmagrippa Cloud'),
+        actions: [
+          IconButton(
+            tooltip: 'Changer le thème',
+            icon: Icon(isDark ? Icons.light_mode : Icons.dark_mode),
+            onPressed: () => context.read<ThemeProvider>().toggleTheme(),
+          ),
+          IconButton(
+            tooltip: 'Se déconnecter',
+            icon: const Icon(Icons.logout),
+            onPressed: () async {
+              await auth.logout();
+              if (!context.mounted) return;
+              Navigator.of(context).pushAndRemoveUntil(
+                MaterialPageRoute(builder: (_) => const LoginScreen()),
+                (route) => false,
+              );
+            },
+          ),
+        ],
+      ),
+      drawer: Drawer(
+        child: ListView(
+          padding: EdgeInsets.zero,
+          children: [
+            DrawerHeader(
+              decoration: const BoxDecoration(color: AppColors.primary),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  const Icon(Icons.account_circle, color: Colors.white, size: 60),
+                  const SizedBox(height: 8),
+                  Text(user.fullName, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                  Text(user.role.toUpperCase(), style: const TextStyle(color: Colors.white70, fontSize: 12)),
+                ],
+              ),
+            ),
+            _buildMenuTile(icon: Icons.dashboard, label: 'Tableau de bord', index: 0),
+            
+            if (auth.canManageDossiers) ...[
+              _buildMenuTile(icon: Icons.folder, label: 'Mes dossiers', index: 1),
+              _buildMenuTile(icon: Icons.description, label: 'Mes documents', index: 2),
+            ],
+
+            _buildMenuTile(icon: Icons.public, label: 'Publications', index: 3),
+
+            if (auth.isAdmin) ...[
+              const Divider(),
+              _buildMenuTile(icon: Icons.people, label: 'Gestion des comptes', index: 4),
+            ],
+
+            const Divider(),
+            _buildMenuTile(icon: Icons.person, label: 'Mon profil', index: 5),
+
+            const Divider(),
+            ListTile(
+              leading: const Icon(Icons.logout, color: AppColors.secondary),
+              title: const Text('Déconnexion', style: TextStyle(color: AppColors.secondary)),
+              onTap: () async {
+                await auth.logout();
+                if (!context.mounted) return;
+                Navigator.of(context).pushAndRemoveUntil(
+                  MaterialPageRoute(builder: (_) => const LoginScreen()),
+                  (route) => false,
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+      body: _buildBody(user, auth),
+    );
+  }
+
+  Widget _buildMenuTile({required IconData icon, required String label, required int index}) {
+    return ListTile(
+      leading: Icon(icon, color: _selectedIndex == index ? AppColors.primary : null),
+      title: Text(
+        label,
+        style: TextStyle(
+          color: _selectedIndex == index ? AppColors.primary : null,
+          fontWeight: _selectedIndex == index ? FontWeight.bold : FontWeight.normal,
+        ),
+      ),
+      selected: _selectedIndex == index,
+      selectedTileColor: AppColors.primary.withValues(alpha: 0.1),
+      onTap: () {
+        setState(() => _selectedIndex = index);
+        Navigator.of(context).pop();
+      },
+    );
+  }
+
+  Widget _buildBody(User user, AuthProvider auth) {
+    switch (_selectedIndex) {
+      case 0: return _buildHome(user, auth);
+      case 1: return const DossiersScreen();
+      case 2: return const DocumentsScreen();
+      case 3: return const PublicationsScreen(); 
+      case 4: return const UsersScreen();
+      case 5: return const ProfileScreen();
+      default: return _buildHome(user, auth);
+    }
+  }
+
+  // ── PAGE D'ACCUEIL DYNAMIQUE ───────────────────────────────
+  Widget _buildHome(User user, AuthProvider auth) {
+    return RefreshIndicator(
+      onRefresh: _loadStats,
+      color: AppColors.primary,
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Message de bienvenue + Slogan
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 30,
+                      backgroundColor: AppColors.primary.withValues(alpha: 0.1),
+                      child: Text(
+                        user.prenom.isNotEmpty ? user.prenom[0].toUpperCase() : '?',
+                        style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: AppColors.primary),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Bienvenue, ${user.prenom} !', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Consulter et gérer les projets avec toute simplicité.',
+                            style: TextStyle(fontSize: 14, color: Colors.grey.shade600, fontStyle: FontStyle.italic),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 24),
+
+            // Section conditionnelle selon le rôle
+            Text(
+              auth.isTechnicien ? 'Vos publications' : 'Vue d\'ensemble',
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 12),
+
+            if (_isStatsLoading)
+              const Center(child: Padding(padding: EdgeInsets.all(32), child: CircularProgressIndicator()))
+            else if (auth.isTechnicien)
+              _buildTechStats()
+            else
+              _buildStaffStats(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ── STATISTIQUES TECHNICIEN ────────────────────────────────
+  Widget _buildTechStats() {
+    return Card(
+      color: AppColors.primary,
+      child: InkWell(
+        onTap: () => setState(() => _selectedIndex = 3),
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Row(
+            children: [
+              const Icon(Icons.public, color: Colors.white, size: 48),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('$_publicationsCount', style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Colors.white)),
+                    const Text('Documents publiés à consulter', style: TextStyle(color: Colors.white70, fontSize: 16)),
+                  ],
+                ),
+              ),
+              const Icon(Icons.arrow_forward_ios, color: Colors.white54, size: 20),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ── STATISTIQUES STAFF (Admin, Secrétaire, DG, Designer) ───
+  Widget _buildStaffStats() {
+    // On utilise un Wrap pour que les cartes s'alignent bien sur mobile 
+    // et prennent toute la largeur sur PC de manière égale.
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // Si l'écran est large (PC/Web), on met 3 colonnes. Sinon 1 colonne.
+        final isWide = constraints.maxWidth > 800;
+        
+        return Wrap(
+          spacing: 12,
+          runSpacing: 12,
+          children: [
+            SizedBox(
+              width: isWide ? (constraints.maxWidth - 24) / 3 : constraints.maxWidth,
+              child: _buildStatCard(
+                title: 'Dossiers',
+                count: _dossiersCount,
+                icon: Icons.folder,
+                color: AppColors.primary,
+                onTap: () => setState(() => _selectedIndex = 1),
+              ),
+            ),
+            SizedBox(
+              width: isWide ? (constraints.maxWidth - 24) / 3 : constraints.maxWidth,
+              child: _buildStatCard(
+                title: 'Documents',
+                count: _documentsCount,
+                icon: Icons.description,
+                color: Colors.orange,
+                onTap: () => setState(() => _selectedIndex = 2),
+              ),
+            ),
+            SizedBox(
+              width: isWide ? (constraints.maxWidth - 24) / 3 : constraints.maxWidth,
+              child: _buildStatCard(
+                title: 'Publications en ligne',
+                count: _publicationsCount,
+                icon: Icons.public,
+                color: AppColors.success,
+                onTap: () => setState(() => _selectedIndex = 3),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildStatCard({
+    required String title,
+    required int count,
+    required IconData icon,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return Card(
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(icon, color: color, size: 32),
+              const SizedBox(height: 16),
+              Text('$count', style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 4),
+              Text(title, style: const TextStyle(fontSize: 14, color: Colors.grey)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
