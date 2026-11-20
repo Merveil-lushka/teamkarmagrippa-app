@@ -5,6 +5,7 @@ import '../models/user.dart';
 import '../providers/auth_provider.dart';
 import '../providers/theme_provider.dart';
 import '../services/api_service.dart';
+import '../services/update_service.dart';
 import '../theme/app_theme.dart';
 import 'dossiers_screen.dart';
 import 'documents_screen.dart';
@@ -167,6 +168,69 @@ class _DashboardScreenState extends State<DashboardScreen> {
               _buildMenuTile(icon: Icons.people, label: 'Gestion des comptes', index: 4),
             ],
 
+            const Divider(),
+            ListTile(
+              leading: const Icon(Icons.system_update, color: AppColors.primary),
+              title: const Text('Vérifier les mises à jour'),
+              onTap: () async {
+                Navigator.pop(context); // Ferme le drawer
+                final updateService = UpdateService();
+
+                try {
+                  final updateInfo = await updateService.checkForUpdate();
+
+                  if (!context.mounted) return;
+
+                  if (updateInfo != null && updateInfo['needsUpdate'] == true) {
+                    showDialog(
+                      context: context,
+                      barrierDismissible: false,
+                      builder: (ctx) => AlertDialog(
+                        title: const Text('Mise à jour disponible'),
+                        content: Text(
+                          'Une nouvelle version (${updateInfo['latestVersion']}) est disponible. Voulez-vous la télécharger ?',
+                        ),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(ctx),
+                            child: const Text('Plus tard'),
+                          ),
+                          ElevatedButton(
+                            onPressed: () async {
+                              Navigator.pop(ctx);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Téléchargement en cours...'),
+                                  duration: Duration(seconds: 3),
+                                ),
+                              );
+                              await updateService.downloadAndInstall(
+                                updateInfo['downloadUrl'],
+                              );
+                            },
+                            child: const Text('Mettre à jour'),
+                          ),
+                        ],
+                      ),
+                    );
+                  } else {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Votre application est à jour !'),
+                        backgroundColor: AppColors.success,
+                      ),
+                    );
+                  }
+                } catch (e) {
+                  if (!context.mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Impossible de vérifier les mises à jour : $e'),
+                    ),
+                  );
+                }
+              },
+            ),
             const Divider(),
             _buildMenuTile(icon: Icons.person, label: 'Mon profil', index: 5),
 
