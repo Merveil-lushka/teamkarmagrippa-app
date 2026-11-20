@@ -2,18 +2,22 @@ class User {
   final String id;
   final String nom;
   final String prenom;
-  final String email;
+  final String? email; // 👈 L'email n'est plus obligatoire
+  final String agentCode; // 👈 Nouveau champ
   final String role;
   final bool actif;
+  final bool canPublish;
   final String? token;
 
   User({
     required this.id,
     required this.nom,
     required this.prenom,
-    required this.email,
+    this.email,
+    required this.agentCode, // 👈 Ajouté
     required this.role,
     required this.actif,
+    required this.canPublish,
     this.token,
   });
 
@@ -22,10 +26,12 @@ class User {
       id: json['id'] ?? '',
       nom: json['nom'] ?? '',
       prenom: json['prenom'] ?? '',
-      email: json['email'] ?? '',
+      email: json['email'],
+      agentCode: json['agentCode'] ?? '', // 👈 Ajouté
       role: json['role'] ?? 'technicien',
       actif: json['actif'] ?? true,
-      token: json['token'], // Présent uniquement lors du login/register
+      canPublish: json['canPublish'] ?? false,
+      token: json['token'],
     );
   }
 
@@ -35,8 +41,10 @@ class User {
       'nom': nom,
       'prenom': prenom,
       'email': email,
+      'agentCode': agentCode, // 👈 Ajouté
       'role': role,
       'actif': actif,
+      'canPublish': canPublish,
       if (token != null) 'token': token,
     };
   }

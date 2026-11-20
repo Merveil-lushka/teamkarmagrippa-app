@@ -12,6 +12,8 @@ import 'publications_screen.dart';
 import 'users_screen.dart';
 import 'profile_screen.dart';
 import 'login_screen.dart';
+import 'create_document_screen.dart'; // 👈 Import ajouté
+import 'notifications_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -24,7 +26,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
   int _selectedIndex = 0;
   final ApiService _api = ApiService();
 
-  // Statistiques
   bool _isStatsLoading = true;
   int _dossiersCount = 0;
   int _documentsCount = 0;
@@ -77,7 +78,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     if (user == null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (_) => const LoginScreen()),
+          MaterialPageRoute(builder: (_) => LoginScreen()), // 👈 const retiré
           (route) => false,
         );
       });
@@ -88,6 +89,34 @@ class _DashboardScreenState extends State<DashboardScreen> {
       appBar: AppBar(
         title: const Text('TeamKarmagrippa Cloud'),
         actions: [
+          IconButton(
+            tooltip: 'Notifications',
+            icon: Stack(
+              children: [
+                const Icon(Icons.notifications),
+                Positioned(
+                  right: 0,
+                  top: 0,
+                  child: Container(
+                    width: 8,
+                    height: 8,
+                    decoration: const BoxDecoration(
+                      color: AppColors.secondary,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const NotificationsScreen(),
+                ),
+              );
+            },
+          ),
           IconButton(
             tooltip: 'Changer le thème',
             icon: Icon(isDark ? Icons.light_mode : Icons.dark_mode),
@@ -100,7 +129,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               await auth.logout();
               if (!context.mounted) return;
               Navigator.of(context).pushAndRemoveUntil(
-                MaterialPageRoute(builder: (_) => const LoginScreen()),
+                MaterialPageRoute(builder: (_) => LoginScreen()), // 👈 const retiré
                 (route) => false,
               );
             },
@@ -149,7 +178,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 await auth.logout();
                 if (!context.mounted) return;
                 Navigator.of(context).pushAndRemoveUntil(
-                  MaterialPageRoute(builder: (_) => const LoginScreen()),
+                  MaterialPageRoute(builder: (_) => LoginScreen()), // 👈 const retiré
                   (route) => false,
                 );
               },
@@ -192,7 +221,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
-  // ── PAGE D'ACCUEIL DYNAMIQUE ───────────────────────────────
   Widget _buildHome(User user, AuthProvider auth) {
     return RefreshIndicator(
       onRefresh: _loadStats,
@@ -203,7 +231,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Message de bienvenue + Slogan
             Card(
               child: Padding(
                 padding: const EdgeInsets.all(20),
@@ -237,7 +264,31 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
             const SizedBox(height: 24),
 
-            // Section conditionnelle selon le rôle
+            // 👇 Carte du générateur ajoutée ici
+            Card(
+              child: ListTile(
+                contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                leading: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(Icons.picture_as_pdf, color: AppColors.primary, size: 28),
+                ),
+                title: const Text('Générateur de documents', style: TextStyle(fontWeight: FontWeight.bold)),
+                subtitle: const Text('Créer un devis ou une facture avec calculs'),
+                trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const CreateDocumentScreen()),
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 24),
+
             Text(
               auth.isTechnicien ? 'Vos publications' : 'Vue d\'ensemble',
               style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
@@ -256,7 +307,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  // ── STATISTIQUES TECHNICIEN ────────────────────────────────
   Widget _buildTechStats() {
     return Card(
       color: AppColors.primary,
@@ -286,13 +336,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  // ── STATISTIQUES STAFF (Admin, Secrétaire, DG, Designer) ───
   Widget _buildStaffStats() {
-    // On utilise un Wrap pour que les cartes s'alignent bien sur mobile 
-    // et prennent toute la largeur sur PC de manière égale.
     return LayoutBuilder(
       builder: (context, constraints) {
-        // Si l'écran est large (PC/Web), on met 3 colonnes. Sinon 1 colonne.
         final isWide = constraints.maxWidth > 800;
         
         return Wrap(

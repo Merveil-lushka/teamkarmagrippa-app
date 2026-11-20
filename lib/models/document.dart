@@ -47,6 +47,7 @@ class Document {
   final FichierInfo fichier;
   final String? dossierId;
   final String owner;
+  final String ownerName; // 👈 Nouveau champ pour le nom de l'auteur
   final bool isPublished;
 
   Document({
@@ -62,10 +63,20 @@ class Document {
     required this.fichier,
     this.dossierId,
     required this.owner,
+    required this.ownerName, // 👈 Ajouté au constructeur
     required this.isPublished,
   });
 
   factory Document.fromJson(Map<String, dynamic> json) {
+    // 👇 Logique pour extraire le nom complet de l'auteur si l'owner est un objet
+    String oName = '';
+    if (json['owner'] is Map) {
+      final ownerMap = json['owner'] as Map<String, dynamic>;
+      final nom = ownerMap['nom'] ?? '';
+      final prenom = ownerMap['prenom'] ?? '';
+      oName = '$prenom $nom'.trim();
+    }
+
     return Document(
       id: json['id'] ?? '',
       type: json['type'] ?? 'autre',
@@ -81,6 +92,7 @@ class Document {
       fichier: FichierInfo.fromJson(json['fichier'] ?? {}),
       dossierId: json['dossier'],
       owner: json['owner'] is Map ? json['owner']['_id'] : (json['owner'] ?? ''),
+      ownerName: oName, // 👈 Assignation du nom
       isPublished: json['isPublished'] ?? false,
     );
   }

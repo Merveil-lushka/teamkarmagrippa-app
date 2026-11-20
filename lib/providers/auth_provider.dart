@@ -9,7 +9,6 @@ class AuthProvider extends ChangeNotifier {
   bool _loading = false;
   String? _error;
 
-  // ── Getters ──────────────────────────────────────────────
   User? get user => _user;
   bool get loading => _loading;
   String? get error => _error;
@@ -22,9 +21,7 @@ class AuthProvider extends ChangeNotifier {
   bool get isDG => role == 'dg';
   bool get isTechnicien => role == 'technicien';
 
-  /// Rôles autorisés à créer / gérer des dossiers
-  bool get canManageDossiers =>
-      isAdmin || isSecretaire || isDesigner || isDG;
+  bool get canManageDossiers => isAdmin || isSecretaire || isDesigner || isDG || isTechnicien;
 
   void _setLoading(bool v) {
     _loading = v;
@@ -36,9 +33,6 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // ═════════════════════════════════════════════════════════
-  // AUTO-LOGIN (au démarrage de l'app)
-  // ═════════════════════════════════════════════════════════
   Future<bool> autoLogin() async {
     _setLoading(true);
     _setError(null);
@@ -48,15 +42,12 @@ class AuthProvider extends ChangeNotifier {
         _setLoading(false);
         return false;
       }
-
-      // Récupère les infos fraîches du user depuis le backend
       final user = await _api.getMe();
       _user = user;
       await _api.saveUser(user);
       _setLoading(false);
       return true;
     } on ApiException catch (e) {
-      // Token expiré ou invalide → nettoyage
       await _api.logout();
       _user = null;
       _setError(e.message);
@@ -69,14 +60,12 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  // ═════════════════════════════════════════════════════════
-  // LOGIN
-  // ═════════════════════════════════════════════════════════
-  Future<bool> login(String email, String password) async {
+  // 👇 Modifié pour prendre le Code Agent
+  Future<bool> login(String agentCode, String password) async {
     _setLoading(true);
     _setError(null);
     try {
-      final user = await _api.login(email.trim(), password);
+      final user = await _api.login(agentCode.trim(), password);
       _user = user;
       _setLoading(false);
       return true;
@@ -91,41 +80,6 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  // ═════════════════════════════════════════════════════════
-  // REGISTER
-  // ═════════════════════════════════════════════════════════
-  Future<bool> register({
-    required String nom,
-    required String prenom,
-    required String email,
-    required String password,
-  }) async {
-    _setLoading(true);
-    _setError(null);
-    try {
-      final user = await _api.register(
-        nom: nom.trim(),
-        prenom: prenom.trim(),
-        email: email.trim(),
-        password: password,
-      );
-      _user = user;
-      _setLoading(false);
-      return true;
-    } on ApiException catch (e) {
-      _setError(e.message);
-      _setLoading(false);
-      return false;
-    } catch (e) {
-      _setError('Erreur de connexion. Vérifiez le réseau.');
-      _setLoading(false);
-      return false;
-    }
-  }
-
-  // ═════════════════════════════════════════════════════════
-  // LOGOUT
-  // ═════════════════════════════════════════════════════════
   Future<void> logout() async {
     await _api.logout();
     _user = null;
@@ -133,7 +87,6 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // 👇 NOUVELLE MÉTHODE : Mise à jour locale après modification du profil
   void updateUserData(User updatedUser) {
     _user = updatedUser;
     notifyListeners();

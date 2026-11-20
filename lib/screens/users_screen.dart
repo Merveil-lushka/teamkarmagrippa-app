@@ -1,6 +1,4 @@
 import 'package:material_ui/material_ui.dart';
-import 'package:intl/intl.dart';
-
 import '../models/user.dart';
 import '../services/api_service.dart';
 import '../theme/app_theme.dart';
@@ -41,7 +39,8 @@ class _UsersScreenState extends State<UsersScreen> {
     final formKey = GlobalKey<FormState>();
     final nomController = TextEditingController(text: user?.nom ?? '');
     final prenomController = TextEditingController(text: user?.prenom ?? '');
-    final emailController = TextEditingController(text: user?.email ?? '');
+    // On n'affiche plus l'email mais le Code Agent (généré par le serveur)
+    final agentCodeController = TextEditingController(text: user?.agentCode ?? 'Généré automatiquement');
     final passwordController = TextEditingController();
     String selectedRole = user?.role ?? 'technicien';
     bool isSubmitting = false;
@@ -76,17 +75,16 @@ class _UsersScreenState extends State<UsersScreen> {
                         validator: (v) => v == null || v.trim().isEmpty ? 'Requis' : null,
                       ),
                       const SizedBox(height: 12),
+                      // 👇 On affiche le Code Agent
                       TextFormField(
-                        controller: emailController,
-                        enabled: user == null, // On ne change pas l'email en modification
-                        decoration: const InputDecoration(labelText: 'Email *'),
-                        keyboardType: TextInputType.emailAddress,
-                        validator: (v) => v == null || !v.contains('@') ? 'Email invalide' : null,
+                        controller: agentCodeController,
+                        enabled: false, // Non modifiable
+                        decoration: const InputDecoration(labelText: 'Code Agent (Généré par le système)', prefixIcon: Icon(Icons.badge)),
                       ),
                       const SizedBox(height: 12),
                       TextFormField(
                         controller: passwordController,
-                        decoration: InputDecoration(labelText: user == null ? 'Mot de passe *' : 'Nouveau mot de passe (laisser vide pour ne pas changer)'),
+                        decoration: InputDecoration(labelText: user == null ? 'Mot de passe *' : 'Nouveau mot de passe (laisser vide)'),
                         obscureText: true,
                         validator: (v) => user == null && (v == null || v.length < 6) ? 'Min. 6 caractères' : null,
                       ),
@@ -111,10 +109,10 @@ class _UsersScreenState extends State<UsersScreen> {
                           
                           try {
                             if (user == null) {
+                              // Le code agent sera généré par le backend
                               await _api.createUser(
                                 nom: nomController.text.trim(),
                                 prenom: prenomController.text.trim(),
-                                email: emailController.text.trim(),
                                 password: passwordController.text,
                                 role: selectedRole,
                               );
@@ -178,6 +176,32 @@ class _UsersScreenState extends State<UsersScreen> {
     );
   }
 
+  // 👇 Nouvelle fonction pour autoriser/interdire la publication
+  void _togglePublishPermission(User user) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(user.canPublish ? 'Retirer l\'autorisation ?' : 'Autoriser la publication ?'),
+        content: Text('Voulez-vous ${user.canPublish ? 'retirer' : 'donner'} le droit de publier à ${user.fullName} ?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Annuler')),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              try {
+                await _api.updateUser(user.id, canPublish: !user.canPublish);
+                _loadUsers();
+              } catch (e) {
+                if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Erreur : $e')));
+              }
+            },
+            child: Text(user.canPublish ? 'Retirer' : 'Autoriser', style: TextStyle(color: user.canPublish ? AppColors.secondary : AppColors.success)),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _deleteUser(User user) {
     showDialog(
       context: context,
@@ -227,14 +251,28 @@ class _UsersScreenState extends State<UsersScreen> {
                         subtitle: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(u.email),
-                            Text(
-                              u.role.toUpperCase(),
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                                color: u.role == 'admin' ? AppColors.secondary : AppColors.primary,
-                              ),
+                            Text('Code : ${u.agentCode}', style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.primary)),
+                            Row(
+                              children: [
+                                Text(
+                                  u.role.toUpperCase(),
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                    color: u.role == 'admin' ? AppColors.secondary : AppColors.primary,
+                                  ),
+                                ),
+                                if (u.role == 'technicien') ...[
+                                  const SizedBox(width: 8),
+                                  Icon(
+                                    u.canPublish ? Icons.check_circle : Icons.cancel,
+                                    size: 14,
+                                    color: u.canPublish ? AppColors.success : Colors.grey,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(u.canPublish ? 'Peut publier' : 'Ne peut pas publier', style: const TextStyle(fontSize: 10, color: Colors.grey)),
+                                ]
+                              ],
                             ),
                           ],
                         ),
@@ -250,10 +288,21 @@ class _UsersScreenState extends State<UsersScreen> {
                               onSelected: (val) {
                                 if (val == 'edit') _showUserForm(user: u);
                                 if (val == 'toggle') _toggleActive(u);
+                                if (val == 'publish') _togglePublishPermission(u); // 👈 Nouvelle action
                                 if (val == 'delete') _deleteUser(u);
                               },
                               itemBuilder: (ctx) => [
                                 const PopupMenuItem(value: 'edit', child: Row(children: [Icon(Icons.edit, size: 20), SizedBox(width: 8), Text('Modifier')])),
+                                // 👇 On ajoute l'option Publier uniquement pour les techniciens
+                                if (u.role == 'technicien')
+                                  PopupMenuItem(
+                                    value: 'publish',
+                                    child: Row(children: [
+                                      Icon(u.canPublish ? Icons.visibility_off : Icons.public, size: 20, color: AppColors.primary),
+                                      const SizedBox(width: 8),
+                                      Text(u.canPublish ? 'Retirer le droit de publier' : 'Autoriser à publier', style: const TextStyle(color: AppColors.primary)),
+                                    ]),
+                                  ),
                                 PopupMenuItem(
                                   value: 'toggle',
                                   child: Row(children: [

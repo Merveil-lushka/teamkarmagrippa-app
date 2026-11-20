@@ -28,7 +28,7 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
   String? _selectedType;
   int? _selectedMois;
   int? _selectedAnnee;
-  bool? _selectedPublished; // 👈 Nouveau filtre (null = tous, true = publié, false = non publié)
+  bool? _selectedPublished;
 
   @override
   void initState() {
@@ -53,7 +53,7 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
         type: _selectedType,
         mois: _selectedMois,
         annee: _selectedAnnee,
-        published: _selectedPublished, // 👈 On passe le filtre à l'API
+        published: _selectedPublished,
         q: _searchController.text.trim().isEmpty ? null : _searchController.text.trim(),
       );
       if (mounted) {
@@ -80,14 +80,24 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
         url = '$origin${doc.fichier.urlLocale}';
       }
     }
-    if (url == null || url.isEmpty) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Fichier introuvable.')));
-      return;
-    }
+    if (url == null || url.isEmpty) return;
 
     final uri = Uri.parse(url);
     if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Impossible d\'ouvrir le fichier')));
+    }
+  }
+
+  Future<void> _togglePublish(Document doc) async {
+    try {
+      await _api.togglePublish(doc.id, published: !doc.isPublished);
+      _loadDocuments(); // Rafraîchit la liste
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erreur : $e'), backgroundColor: AppColors.secondary),
+        );
+      }
     }
   }
 
@@ -116,7 +126,6 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
                   const Text('Filtrer les documents', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 16),
                   
-                  // Type
                   DropdownButtonFormField<String>(
                     value: _selectedType,
                     decoration: const InputDecoration(labelText: 'Type de document'),
@@ -130,7 +139,6 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
                   ),
                   const SizedBox(height: 12),
 
-                  // Mois
                   DropdownButtonFormField<int>(
                     value: _selectedMois,
                     decoration: const InputDecoration(labelText: 'Mois'),
@@ -145,7 +153,6 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
                   ),
                   const SizedBox(height: 12),
 
-                  // Année
                   DropdownButtonFormField<int>(
                     value: _selectedAnnee,
                     decoration: const InputDecoration(labelText: 'Année'),
@@ -160,7 +167,6 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
                   ),
                   const SizedBox(height: 12),
 
-                  // 👇 Nouveau : Statut de publication
                   DropdownButtonFormField<bool>(
                     value: _selectedPublished,
                     decoration: const InputDecoration(labelText: 'Statut de publication'),
@@ -182,7 +188,7 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
                               _selectedType = null;
                               _selectedMois = null;
                               _selectedAnnee = null;
-                              _selectedPublished = null; // 👈 Réinitialisation
+                              _selectedPublished = null;
                             });
                           },
                           child: const Text('Réinitialiser'),
@@ -209,6 +215,23 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
     );
   }
 
+  // 👇 Menu d'actions réutilisable (avec Publier)
+  List<PopupMenuEntry<String>> _buildMenuItems(Document doc) {
+    return [
+      const PopupMenuItem(value: 'edit', child: Row(children: [Icon(Icons.edit, size: 20), SizedBox(width: 8), Text('Modifier')])),
+      PopupMenuItem(
+        value: 'publish',
+        child: Row(
+          children: [
+            Icon(doc.isPublished ? Icons.visibility_off : Icons.public, size: 20, color: Colors.blue),
+            const SizedBox(width: 8),
+            Text(doc.isPublished ? 'Dépublier' : 'Publier'),
+          ],
+        ),
+      ),
+    ];
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -226,27 +249,14 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
                     decoration: InputDecoration(
                       hintText: 'Rechercher un document...',
                       prefixIcon: const Icon(Icons.search),
-                      suffixIcon: IconButton(
-                        icon: const Icon(Icons.clear),
-                        onPressed: () {
-                          _searchController.clear();
-                          _loadDocuments();
-                        },
-                      ),
+                      suffixIcon: IconButton(icon: const Icon(Icons.clear), onPressed: () { _searchController.clear(); _loadDocuments(); }),
                     ),
                   ),
                 ),
                 const SizedBox(width: 8),
-                IconButton.filledTonal(
-                  icon: const Icon(Icons.filter_list),
-                  onPressed: _showFilters,
-                  tooltip: 'Filtres',
-                ),
+                IconButton.filledTonal(icon: const Icon(Icons.filter_list), onPressed: _showFilters),
                 const SizedBox(width: 8),
-                IconButton.filledTonal(
-                  icon: Icon(_isGridView ? Icons.view_list : Icons.grid_view),
-                  onPressed: () => setState(() => _isGridView = !_isGridView),
-                ),
+                IconButton.filledTonal(icon: Icon(_isGridView ? Icons.view_list : Icons.grid_view), onPressed: () => setState(() => _isGridView = !_isGridView)),
               ],
             ),
           ),
@@ -284,20 +294,14 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
                 if (doc.isPublished)
                   const Padding(
                     padding: EdgeInsets.only(right: 8.0),
-                    child: Chip(
-                      label: Text('Publié', style: TextStyle(fontSize: 10)),
-                      backgroundColor: Color(0xFFE8F5E9),
-                      side: BorderSide.none,
-                      visualDensity: VisualDensity.compact,
-                    ),
+                    child: Chip(label: Text('Publié', style: TextStyle(fontSize: 10)), backgroundColor: Color(0xFFE8F5E9), side: BorderSide.none, visualDensity: VisualDensity.compact),
                   ),
                 PopupMenuButton<String>(
                   onSelected: (val) {
                     if (val == 'edit') _editFile(doc);
+                    if (val == 'publish') _togglePublish(doc); // 👈 Action ajoutée
                   },
-                  itemBuilder: (ctx) => [
-                    const PopupMenuItem(value: 'edit', child: Row(children: [Icon(Icons.edit, size: 20), SizedBox(width: 8), Text('Modifier')])),
-                  ],
+                  itemBuilder: (ctx) => _buildMenuItems(doc),
                 ),
               ],
             ),
@@ -310,37 +314,47 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
   Widget _buildGridView() {
     return GridView.builder(
       padding: const EdgeInsets.symmetric(horizontal: 16),
-      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-        maxCrossAxisExtent: 220,
-        crossAxisSpacing: 12,
-        mainAxisSpacing: 12,
-        childAspectRatio: 0.9,
-      ),
+      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(maxCrossAxisExtent: 220, crossAxisSpacing: 12, mainAxisSpacing: 12, childAspectRatio: 0.9),
       itemCount: _documents.length,
       itemBuilder: (context, index) {
         final doc = _documents[index];
         return Card(
-          child: InkWell(
-            borderRadius: BorderRadius.circular(12),
-            onTap: () => _openFile(doc),
-            child: Padding(
-              padding: const EdgeInsets.all(12.0),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(_getFileIcon(doc.type), color: _getFileColor(doc.type), size: 48),
-                  const SizedBox(height: 12),
-                  Text(doc.nom, textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                  const SizedBox(height: 4),
-                  Text(doc.fichier.tailleLisible, style: const TextStyle(fontSize: 12, color: Colors.grey)),
-                  const Spacer(),
-                  if (doc.isPublished)
-                    const Icon(Icons.public, color: AppColors.success, size: 20)
-                  else
-                    const SizedBox(height: 20),
-                ],
+          child: Stack(
+            children: [
+              InkWell(
+                borderRadius: BorderRadius.circular(12),
+                onTap: () => _openFile(doc),
+                child: Padding(
+                  padding: const EdgeInsets.all(12.0),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(_getFileIcon(doc.type), color: _getFileColor(doc.type), size: 48),
+                      const SizedBox(height: 12),
+                      Text(doc.nom, textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                      const SizedBox(height: 4),
+                      Text(doc.fichier.tailleLisible, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                      const Spacer(),
+                      if (doc.isPublished)
+                        const Icon(Icons.public, color: AppColors.success, size: 20)
+                      else
+                        const SizedBox(height: 20),
+                    ],
+                  ),
+                ),
               ),
-            ),
+              Positioned(
+                top: 0, right: 0,
+                child: PopupMenuButton<String>(
+                  icon: const Icon(Icons.more_vert, size: 20),
+                  onSelected: (val) {
+                    if (val == 'edit') _editFile(doc);
+                    if (val == 'publish') _togglePublish(doc); // 👈 Action ajoutée
+                  },
+                  itemBuilder: (ctx) => _buildMenuItems(doc),
+                ),
+              ),
+            ],
           ),
         );
       },

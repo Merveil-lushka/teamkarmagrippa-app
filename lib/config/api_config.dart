@@ -2,32 +2,24 @@ import 'dart:io' show Platform;
 import 'package:flutter/foundation.dart' show kIsWeb;
 
 class ApiConfig {
-  /// ── URL du backend ────────────────────────────────────────
-  /// 
-  /// - Web / Desktop (Linux, macOS, Windows) : localhost:5000
-  /// - Android Emulator : 10.0.2.2:5000 (alias de localhost pour l'émulateur)
-  /// - Téléphone réel : remplace par l'IP locale de ton PC (ex: 192.168.1.42)
-  ///   (le téléphone et le PC doivent être sur le même WiFi)
-  /// 
-  /// Pour connaître ton IP locale : `hostname -I` sur Linux
+  // 👇 Ton URL Render (sans le /api à la fin)
+  static const String _productionUrl = 'https://teamkarmagrippa-backend.onrender.com';
+
   static String get baseUrl {
+    // Sur le Web (Chrome), sur Android (émulateur ou vrai téléphone), 
+    // ou sur Desktop, on utilise toujours l'URL de Render.
     if (kIsWeb) {
-      return 'http://localhost:5000/api';
+      return '$_productionUrl/api';
     }
-    if (Platform.isAndroid) {
-      // Pour un émulateur, 10.0.2.2 pointe vers le localhost de la machine hôte.
-      // Pour un téléphone réel, remplace par l'IP de ton PC :
-      // return 'http://192.168.1.42:5000/api';
-      return 'http://10.0.2.2:5000/api';
-    }
-    // Linux, macOS, Windows desktop
-    return 'http://localhost:5000/api';
+    
+    return '$_productionUrl/api';
   }
 
   /// ── Timeouts ──────────────────────────────────────────────
+  // On garde 30 secondes pour les requêtes normales
   static const Duration requestTimeout = Duration(seconds: 30);
   
-  // 👇 Passé à 1 heure pour laisser le temps aux gros fichiers (vidéos)
+  // On garde 1 heure pour les gros uploads de fichiers
   static const Duration uploadTimeout = Duration(hours: 1); 
 
   /// ── Endpoints d'authentification ──────────────────────────
@@ -44,12 +36,12 @@ class ApiConfig {
   /// ── Construction d'URL de fichiers ────────────────────────
   /// Les URLs Cloudinary sont complètes (https://...), les URLs locales
   /// sont relatives (/uploads/...). On doit préfixer ces dernières par
-  /// l'origine du serveur (sans /api).
+  /// l'origine du serveur Render (sans /api).
   static String resolveFileUrl(String? urlLocale, String? urlCloud) {
     if (urlCloud != null && urlCloud.isNotEmpty) return urlCloud;
     if (urlLocale == null || urlLocale.isEmpty) return '';
     
-    final origin = baseUrl.replaceAll(RegExp(r'/api$'), '');
+    final origin = _productionUrl; // https://teamkarmagrippa-backend.onrender.com
     return '$origin$urlLocale';
   }
 }

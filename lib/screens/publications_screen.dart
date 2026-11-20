@@ -1,11 +1,11 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:intl/intl.dart';
-import 'package:url_launcher/url_launcher.dart'; // 👈 Import ajouté
+import 'package:url_launcher/url_launcher.dart';
 
 import '../models/document.dart';
 import '../services/api_service.dart';
 import '../theme/app_theme.dart';
-import '../config/api_config.dart'; // 👈 Import ajouté
+import '../config/api_config.dart';
 import 'publication_detail_screen.dart';
 
 class PublicationsScreen extends StatefulWidget {
@@ -24,6 +24,7 @@ class _PublicationsScreenState extends State<PublicationsScreen> {
   String? _error;
   bool _isGridView = false;
   String? _selectedType;
+  Map<String, dynamic> _unreadCounts = {}; // 👈 Stocke les badges
 
   @override
   void initState() {
@@ -48,9 +49,13 @@ class _PublicationsScreenState extends State<PublicationsScreen> {
         type: _selectedType,
         q: _searchController.text.trim().isEmpty ? null : _searchController.text.trim(),
       );
+      // 👇 On récupère les compteurs de messages non lus
+      final counts = await _api.getUnreadCommentCounts();
+      
       if (mounted) {
         setState(() {
           _documents = docs;
+          _unreadCounts = counts;
           _isLoading = false;
         });
       }
@@ -64,7 +69,6 @@ class _PublicationsScreenState extends State<PublicationsScreen> {
     }
   }
 
-  // 👇 Fonction pour ouvrir le fichier
   Future<void> _openFile(Document doc) async {
     String? url = doc.fichier.urlCloud;
     if (url == null || url.isEmpty) {
@@ -84,12 +88,11 @@ class _PublicationsScreenState extends State<PublicationsScreen> {
     }
   }
 
-  // 👇 Fonction pour ouvrir les commentaires
   void _openDetail(Document doc) {
     Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => PublicationDetailScreen(document: doc)),
-    );
+    ).then((_) => _loadPublications()); // 👈 Recharge les compteurs au retour
   }
 
   void _showFilters() {
@@ -167,27 +170,14 @@ class _PublicationsScreenState extends State<PublicationsScreen> {
                     decoration: InputDecoration(
                       hintText: 'Rechercher une publication...',
                       prefixIcon: const Icon(Icons.search),
-                      suffixIcon: IconButton(
-                        icon: const Icon(Icons.clear),
-                        onPressed: () {
-                          _searchController.clear();
-                          _loadPublications();
-                        },
-                      ),
+                      suffixIcon: IconButton(icon: const Icon(Icons.clear), onPressed: () { _searchController.clear(); _loadPublications(); }),
                     ),
                   ),
                 ),
                 const SizedBox(width: 8),
-                IconButton.filledTonal(
-                  icon: const Icon(Icons.filter_list),
-                  onPressed: _showFilters,
-                  tooltip: 'Filtres',
-                ),
+                IconButton.filledTonal(icon: const Icon(Icons.filter_list), onPressed: _showFilters),
                 const SizedBox(width: 8),
-                IconButton.filledTonal(
-                  icon: Icon(_isGridView ? Icons.view_list : Icons.grid_view),
-                  onPressed: () => setState(() => _isGridView = !_isGridView),
-                ),
+                IconButton.filledTonal(icon: Icon(_isGridView ? Icons.view_list : Icons.grid_view), onPressed: () => setState(() => _isGridView = !_isGridView)),
               ],
             ),
           ),
@@ -220,27 +210,42 @@ class _PublicationsScreenState extends State<PublicationsScreen> {
       itemCount: _documents.length,
       itemBuilder: (context, index) {
         final doc = _documents[index];
+        final unreadCount = _unreadCounts[doc.id] ?? 0; // 👈 Récupère le badge
+        
         return Card(
           margin: const EdgeInsets.only(bottom: 8),
           child: ListTile(
-            onTap: () => _openFile(doc), // 👈 Clic sur la ligne = Ouvrir le fichier
+            onTap: () => _openFile(doc),
             leading: Icon(_getFileIcon(doc.type), color: _getFileColor(doc.type), size: 36),
             title: Text(doc.nom, style: const TextStyle(fontWeight: FontWeight.bold)),
-            subtitle: Text('${doc.fichier.tailleLisible} • ${DateFormat('dd/MM/yyyy').format(doc.dateDocument)}'),
+            subtitle: Text('${doc.fichier.tailleLisible} • ${DateFormat('dd/MM/yyyy').format(doc.dateDocument)}\nPublié par : ${doc.ownerName}'),
+            isThreeLine: true,
             trailing: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Bouton Voir
                 IconButton(
                   icon: const Icon(Icons.visibility, color: AppColors.primary),
                   tooltip: 'Lire le fichier',
                   onPressed: () => _openFile(doc),
                 ),
-                // Bouton Commentaires
-                IconButton(
-                  icon: const Icon(Icons.chat_bubble_outline, color: AppColors.primary),
-                  tooltip: 'Voir les commentaires',
-                  onPressed: () => _openDetail(doc),
+                Stack(
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.chat_bubble_outline, color: AppColors.primary),
+                      tooltip: 'Voir les commentaires',
+                      onPressed: () => _openDetail(doc),
+                    ),
+                    // 👇 LE BADGE ROUGE
+                    if (unreadCount > 0)
+                      Positioned(
+                        right: 6, top: 6,
+                        child: Container(
+                          padding: const EdgeInsets.all(4),
+                          decoration: const BoxDecoration(color: AppColors.secondary, shape: BoxShape.circle),
+                          child: Text('$unreadCount', style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+                        ),
+                      ),
+                  ],
                 ),
               ],
             ),
@@ -257,15 +262,17 @@ class _PublicationsScreenState extends State<PublicationsScreen> {
         maxCrossAxisExtent: 220,
         crossAxisSpacing: 12,
         mainAxisSpacing: 12,
-        childAspectRatio: 0.85, // Un peu plus haut pour faire de la place aux boutons
+        childAspectRatio: 0.8,
       ),
       itemCount: _documents.length,
       itemBuilder: (context, index) {
         final doc = _documents[index];
+        final unreadCount = _unreadCounts[doc.id] ?? 0; // 👈 Récupère le badge
+        
         return Card(
           child: InkWell(
             borderRadius: BorderRadius.circular(12),
-            onTap: () => _openFile(doc), // 👈 Clic sur la carte = Ouvrir le fichier
+            onTap: () => _openFile(doc),
             child: Padding(
               padding: const EdgeInsets.all(12.0),
               child: Column(
@@ -276,22 +283,26 @@ class _PublicationsScreenState extends State<PublicationsScreen> {
                   Text(doc.nom, textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                   const SizedBox(height: 4),
                   Text(doc.fichier.tailleLisible, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                  Text(doc.ownerName, textAlign: TextAlign.center, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11, color: AppColors.primary, fontStyle: FontStyle.italic)),
                   const Spacer(),
-                  // Boutons d'action en bas de la carte
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     children: [
-                      IconButton(
-                        icon: const Icon(Icons.visibility, color: AppColors.primary),
-                        onPressed: () => _openFile(doc),
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.chat_bubble_outline, color: AppColors.primary),
-                        onPressed: () => _openDetail(doc),
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(),
+                      IconButton(icon: const Icon(Icons.visibility, color: AppColors.primary), onPressed: () => _openFile(doc), padding: EdgeInsets.zero, constraints: const BoxConstraints()),
+                      Stack(
+                        children: [
+                          IconButton(icon: const Icon(Icons.chat_bubble_outline, color: AppColors.primary), onPressed: () => _openDetail(doc), padding: EdgeInsets.zero, constraints: const BoxConstraints()),
+                          // 👇 LE BADGE ROUGE (Vue Grille)
+                          if (unreadCount > 0)
+                            Positioned(
+                              right: 0, top: 0,
+                              child: Container(
+                                padding: const EdgeInsets.all(4),
+                                decoration: const BoxDecoration(color: AppColors.secondary, shape: BoxShape.circle),
+                                child: Text('$unreadCount', style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+                              ),
+                            ),
+                        ],
                       ),
                     ],
                   ),

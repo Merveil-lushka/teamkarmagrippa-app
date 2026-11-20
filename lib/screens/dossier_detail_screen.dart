@@ -7,7 +7,7 @@ import '../services/api_service.dart';
 import '../theme/app_theme.dart';
 import '../config/api_config.dart';
 import 'upload_document_screen.dart';
-import 'edit_document_screen.dart'; // 👈 Import du nouvel écran
+import 'edit_document_screen.dart';
 
 class DossierDetailScreen extends StatefulWidget {
   final String dossierId;
@@ -27,7 +27,7 @@ class _DossierDetailScreenState extends State<DossierDetailScreen> {
   final ApiService _api = ApiService();
   bool _isLoading = true;
   String? _error;
-  bool _isGridView = false; // 👈 État pour basculer Liste/Grille
+  bool _isGridView = false;
   
   Map<String, dynamic>? _dossierData;
   List<Document> _documents = [];
@@ -135,15 +135,61 @@ class _DossierDetailScreenState extends State<DossierDetailScreen> {
     );
   }
 
-  // 👇 Redirection vers le nouvel écran complet de modification
   Future<void> _editFile(Document doc) async {
     final result = await Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => EditDocumentScreen(document: doc)),
     );
     if (result == true) {
-      _loadDetails(); // Rafraîchir la liste après modification
+      _loadDetails();
     }
+  }
+
+  // 👇 NOUVELLE FONCTION : Afficher les propriétés du fichier
+  void _showFileProperties(Document doc) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(_getFileIcon(doc.type), color: _getFileColor(doc.type)),
+            const SizedBox(width: 8),
+            const Text('Propriétés'),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildPropRow('Nom', doc.nom),
+              _buildPropRow('Type', doc.type.toUpperCase()),
+              _buildPropRow('Taille', doc.fichier.tailleLisible),
+              _buildPropRow('Date du document', DateFormat('dd/MM/yyyy').format(doc.dateDocument)),
+              _buildPropRow('Entreprise', doc.entrepriseCliente.isEmpty ? '-' : doc.entrepriseCliente),
+              _buildPropRow('Chantier', doc.nomChantier.isEmpty ? '-' : doc.nomChantier),
+              _buildPropRow('Statut', doc.isPublished ? 'Publié' : 'Privé'),
+              if (doc.description.isNotEmpty) _buildPropRow('Description', doc.description),
+            ],
+          ),
+        ),
+        actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Fermer'))],
+      ),
+    );
+  }
+
+  // 👇 Helper pour afficher une ligne d'information
+  Widget _buildPropRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.grey)),
+          Text(value, style: const TextStyle(fontSize: 15)),
+        ],
+      ),
+    );
   }
 
   @override
@@ -196,7 +242,6 @@ class _DossierDetailScreenState extends State<DossierDetailScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // ── En-tête du dossier ──
         Container(
           padding: const EdgeInsets.all(20),
           color: Theme.of(context).cardTheme.color,
@@ -242,7 +287,6 @@ class _DossierDetailScreenState extends State<DossierDetailScreen> {
           ),
         ),
 
-        // ── Titre et bouton de vue ──
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 24, 16, 8),
           child: Row(
@@ -265,7 +309,6 @@ class _DossierDetailScreenState extends State<DossierDetailScreen> {
           ),
         ),
 
-        // ── Liste ou Grille ──
         Expanded(
           child: _documents.isEmpty
               ? Center(
@@ -284,7 +327,6 @@ class _DossierDetailScreenState extends State<DossierDetailScreen> {
     );
   }
 
-  // ── Vue LISTE ──────────────────────────────────────────────
   Widget _buildListView() {
     return ListView.builder(
       padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -296,7 +338,6 @@ class _DossierDetailScreenState extends State<DossierDetailScreen> {
     );
   }
 
-  // ── Vue GRILLE ─────────────────────────────────────────────
   Widget _buildGridView() {
     return GridView.builder(
       padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -344,6 +385,8 @@ class _DossierDetailScreenState extends State<DossierDetailScreen> {
                         padding: EdgeInsets.zero,
                         icon: const Icon(Icons.more_vert, size: 20),
                         onSelected: (value) {
+                          // 👇 Ajout de la gestion des propriétés
+                          if (value == 'props') _showFileProperties(doc);
                           if (value == 'edit') _editFile(doc);
                           if (value == 'delete') _deleteFile(doc);
                           if (value == 'publish') _togglePublish(doc);
@@ -361,7 +404,6 @@ class _DossierDetailScreenState extends State<DossierDetailScreen> {
     );
   }
 
-  // ── Helpers pour les icônes et menus ───────────────────────
   IconData _getFileIcon(String type) {
     if (type == 'devis' || type == 'facture' || type == 'pdf') return Icons.picture_as_pdf;
     if (type == 'photo') return Icons.image;
@@ -382,8 +424,10 @@ class _DossierDetailScreenState extends State<DossierDetailScreen> {
     return Colors.grey;
   }
 
+  // 👇 Mise à jour du menu pour inclure Propriétés
   List<PopupMenuEntry<String>> _buildMenuItems(Document doc) {
     return [
+      const PopupMenuItem(value: 'props', child: Row(children: [Icon(Icons.info_outline, size: 20), SizedBox(width: 8), Text('Propriétés')])),
       const PopupMenuItem(value: 'edit', child: Row(children: [Icon(Icons.edit, size: 20), SizedBox(width: 8), Text('Modifier')])),
       PopupMenuItem(
         value: 'publish',
@@ -403,7 +447,6 @@ class _DossierDetailScreenState extends State<DossierDetailScreen> {
     ];
   }
 
-  // ── Carte Document (Vue Liste) ─────────────────────────────
   Widget _buildDocumentCard(Document doc) {
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
@@ -429,6 +472,8 @@ class _DossierDetailScreenState extends State<DossierDetailScreen> {
               ),
             PopupMenuButton<String>(
               onSelected: (value) {
+                // 👇 Ajout de la gestion des propriétés
+                if (value == 'props') _showFileProperties(doc);
                 if (value == 'edit') _editFile(doc);
                 if (value == 'delete') _deleteFile(doc);
                 if (value == 'publish') _togglePublish(doc);

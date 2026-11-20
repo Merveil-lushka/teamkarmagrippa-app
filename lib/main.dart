@@ -86,6 +86,6 @@ class _AuthWrapperState extends State<AuthWrapper> {
     }
 
     final auth = context.watch<AuthProvider>();
-    return auth.isAuthenticated ? const DashboardScreen() : const LoginScreen();
+    return auth.isAuthenticated ? DashboardScreen() : LoginScreen();
   }
 }

@@ -13,13 +13,13 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _emailController = TextEditingController();
+  final _agentCodeController = TextEditingController(); // 👈 Renommé
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
 
   @override
   void dispose() {
-    _emailController.dispose();
+    _agentCodeController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
@@ -30,7 +30,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
     final auth = context.read<AuthProvider>();
     final success = await auth.login(
-      _emailController.text.trim(),
+      _agentCodeController.text.trim(),
       _passwordController.text,
     );
 
@@ -38,7 +38,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
     if (success) {
       Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const DashboardScreen()),
+        MaterialPageRoute(builder: (_) => DashboardScreen()),
       );
     }
   }
@@ -61,7 +61,6 @@ class _LoginScreenState extends State<LoginScreen> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    // ── Logo / Titre ──
                     Icon(
                       Icons.cloud_queue,
                       size: 80,
@@ -88,18 +87,17 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     const SizedBox(height: 40),
 
-                    // ── Email ──
+                    // 👇 Champ Code Agent
                     TextFormField(
-                      controller: _emailController,
-                      keyboardType: TextInputType.emailAddress,
+                      controller: _agentCodeController,
+                      keyboardType: TextInputType.text,
                       textInputAction: TextInputAction.next,
                       decoration: const InputDecoration(
-                        labelText: 'Email',
-                        prefixIcon: Icon(Icons.email_outlined),
+                        labelText: 'Code Agent (ex: TK20260001)',
+                        prefixIcon: Icon(Icons.badge_outlined),
                       ),
                       validator: (v) {
-                        if (v == null || v.trim().isEmpty) return 'Email requis';
-                        if (!v.contains('@')) return 'Email invalide';
+                        if (v == null || v.trim().isEmpty) return 'Code Agent requis';
                         return null;
                       },
                     ),
@@ -130,7 +128,6 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     const SizedBox(height: 12),
 
-                    // ── Erreur ──
                     if (auth.error != null)
                       Container(
                         padding: const EdgeInsets.all(12),
@@ -141,14 +138,12 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                         child: Row(
                           children: [
-                            const Icon(Icons.error_outline,
-                                color: AppColors.secondary, size: 20),
+                            const Icon(Icons.error_outline, color: AppColors.secondary, size: 20),
                             const SizedBox(width: 8),
                             Expanded(
                               child: Text(
                                 auth.error!,
-                                style: const TextStyle(
-                                    color: AppColors.secondary, fontSize: 14),
+                                style: const TextStyle(color: AppColors.secondary, fontSize: 14),
                               ),
                             ),
                           ],
@@ -156,7 +151,6 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     if (auth.error != null) const SizedBox(height: 12),
 
-                    // ── Bouton ──
                     ElevatedButton(
                       onPressed: auth.loading ? null : _submit,
                       child: auth.loading
@@ -172,7 +166,6 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     const SizedBox(height: 24),
 
-                    // ── Note de bas de page ──
                     Text(
                       '© ${DateTime.now().year} TeamKarmagrippa',
                       textAlign: TextAlign.center,
