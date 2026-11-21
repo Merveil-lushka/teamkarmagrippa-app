@@ -750,20 +750,34 @@ class ApiService {
     return ChatMessage.fromJson(json['data']);
   }
 
-  Future<ChatMessage> sendMessageFile(File file, String fileName) async {
+  Future<ChatMessage> sendMessageFile(
+    File? file,
+    Uint8List? fileBytes,
+    String fileName,
+  ) async {
     final request = http.MultipartRequest(
       'POST',
       Uri.parse('${ApiConfig.baseUrl}/messages/file'),
     );
     final token = await getToken();
     if (token != null) request.headers['Authorization'] = 'Bearer $token';
-    request.files.add(
-      await http.MultipartFile.fromPath(
-        'fichier',
-        file.path,
-        filename: fileName,
-      ),
-    );
+
+    if (fileBytes != null) {
+      request.files.add(
+        http.MultipartFile.fromBytes('fichier', fileBytes, filename: fileName),
+      );
+    } else if (file != null) {
+      request.files.add(
+        await http.MultipartFile.fromPath(
+          'fichier',
+          file.path,
+          filename: fileName,
+        ),
+      );
+    } else {
+      throw ApiException('Aucun fichier fourni');
+    }
+
     final streamedResponse = await request.send()
         .timeout(ApiConfig.uploadTimeout);
     final response = await http.Response.fromStream(streamedResponse);

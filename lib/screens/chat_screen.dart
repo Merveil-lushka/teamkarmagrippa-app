@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:file_picker/file_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:material_ui/material_ui.dart';
@@ -83,15 +84,28 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Future<void> _pickFile() async {
-    final result = await FilePicker.pickFiles();
-    if (result != null && result.isNotEmpty) {
-      final file = File(result.first.path!);
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Envoi du fichier...')));
-      try {
-        await _api.sendMessageFile(file, result.first.name);
+    try {
+      final result = await FilePicker.pickFiles();
+
+      if (result.isNotEmpty) {
+        final platformFile = result.first;
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Envoi du fichier...')),
+          );
+        }
+
+        final path = platformFile.path;
+        final file = path != null ? File(path) : null;
+        final fileBytes = await platformFile.readAsBytes();
+        await _api.sendMessageFile(file, fileBytes, platformFile.name);
         _loadMessages();
-      } catch (e) {
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Erreur: $e')));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erreur: $e')),
+        );
       }
     }
   }
