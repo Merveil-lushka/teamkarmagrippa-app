@@ -32,7 +32,6 @@ class _ChatScreenState extends State<ChatScreen> {
   void initState() {
     super.initState();
     _loadMessages();
-    // Rafraîchit les messages toutes les 3 secondes
     _timer = Timer.periodic(const Duration(seconds: 3), (_) => _loadMessages(silent: true));
   }
 
@@ -97,28 +96,13 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
-  void _deleteMessage(ChatMessage msg) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Supprimer le message ?'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Annuler')),
-          TextButton(
-            onPressed: () async {
-              Navigator.pop(ctx);
-              try {
-                await _api.deleteMessage(msg.id);
-                _loadMessages();
-              } catch (e) {
-                if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Erreur: $e')));
-              }
-            },
-            child: const Text('Supprimer', style: TextStyle(color: AppColors.secondary)),
-          ),
-        ],
-      ),
-    );
+  void _deleteMessage(ChatMessage msg) async {
+    try {
+      await _api.deleteMessage(msg.id);
+      _loadMessages();
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Erreur: $e')));
+    }
   }
 
   Future<void> _openFile(String? url) async {
@@ -156,72 +140,89 @@ class _ChatScreenState extends State<ChatScreen> {
 
                       return Align(
                         alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
-                        child: GestureDetector(
-                          onLongPress: canDelete ? () => _deleteMessage(msg) : null,
-                          child: Container(
-                            margin: const EdgeInsets.only(bottom: 12),
-                            padding: const EdgeInsets.all(12),
-                            constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.75),
-                            decoration: BoxDecoration(
-                              color: isMe ? AppColors.primary : (isDark ? Colors.grey.shade800 : Colors.grey.shade200),
-                              borderRadius: BorderRadius.only(
-                                topLeft: const Radius.circular(16),
-                                topRight: const Radius.circular(16),
-                                bottomLeft: isMe ? const Radius.circular(16) : Radius.zero,
-                                bottomRight: isMe ? Radius.zero : const Radius.circular(16),
-                              ),
+                        child: Container(
+                          margin: const EdgeInsets.only(bottom: 12),
+                          padding: const EdgeInsets.all(12),
+                          constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.75),
+                          decoration: BoxDecoration(
+                            color: isMe ? AppColors.primary : (isDark ? Colors.grey.shade800 : Colors.grey.shade200),
+                            borderRadius: BorderRadius.only(
+                              topLeft: const Radius.circular(16),
+                              topRight: const Radius.circular(16),
+                              bottomLeft: isMe ? const Radius.circular(16) : Radius.zero,
+                              bottomRight: isMe ? Radius.zero : const Radius.circular(16),
                             ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                if (!isMe)
-                                  Text(
-                                    '${msg.senderName} (${msg.senderRole})',
-                                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: isDark ? AppColors.primaryLight : AppColors.primaryDark),
-                                  ),
-                                if (!isMe) const SizedBox(height: 4),
-                                
-                                if (msg.text.isNotEmpty)
-                                  Text(msg.text, style: TextStyle(color: isMe ? Colors.white : (isDark ? Colors.white : Colors.black87))),
-                                
-                                if (msg.fileUrl != null) ...[
-                                  const SizedBox(height: 8),
-                                  InkWell(
-                                    onTap: () => _openFile(msg.fileUrl),
-                                    child: Container(
-                                      padding: const EdgeInsets.all(8),
-                                      decoration: BoxDecoration(
-                                        color: isMe ? Colors.white24 : Colors.black12,
-                                        borderRadius: BorderRadius.circular(8),
-                                      ),
-                                      child: Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Icon(Icons.insert_drive_file, color: isMe ? Colors.white : AppColors.primary, size: 20),
-                                          const SizedBox(width: 8),
-                                          Flexible(
-                                            child: Text(
-                                              msg.fileName ?? 'Fichier',
-                                              overflow: TextOverflow.ellipsis,
-                                              style: TextStyle(color: isMe ? Colors.white : (isDark ? Colors.white : Colors.black87), fontSize: 13),
+                          ),
+                          child: Stack(
+                            children: [
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  if (!isMe)
+                                    Text(
+                                      '${msg.senderName} (${msg.senderRole})',
+                                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: isDark ? AppColors.primaryLight : AppColors.primaryDark),
+                                    ),
+                                  if (!isMe) const SizedBox(height: 4),
+                                  
+                                  if (msg.text.isNotEmpty)
+                                    Text(msg.text, style: TextStyle(color: isMe ? Colors.white : (isDark ? Colors.white : Colors.black87))),
+                                  
+                                  if (msg.fileUrl != null) ...[
+                                    const SizedBox(height: 8),
+                                    InkWell(
+                                      onTap: () => _openFile(msg.fileUrl),
+                                      child: Container(
+                                        padding: const EdgeInsets.all(8),
+                                        decoration: BoxDecoration(
+                                          color: isMe ? Colors.white24 : Colors.black12,
+                                          borderRadius: BorderRadius.circular(8),
+                                        ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Icon(Icons.insert_drive_file, color: isMe ? Colors.white : AppColors.primary, size: 20),
+                                            const SizedBox(width: 8),
+                                            Flexible(
+                                              child: Text(
+                                                msg.fileName ?? 'Fichier',
+                                                overflow: TextOverflow.ellipsis,
+                                                style: TextStyle(color: isMe ? Colors.white : (isDark ? Colors.white : Colors.black87), fontSize: 13),
+                                              ),
                                             ),
-                                          ),
-                                        ],
+                                          ],
+                                        ),
                                       ),
+                                    ),
+                                  ],
+                                  
+                                  const SizedBox(height: 4),
+                                  Align(
+                                    alignment: Alignment.bottomRight,
+                                    child: Text(
+                                      DateFormat('HH:mm').format(msg.createdAt),
+                                      style: TextStyle(fontSize: 10, color: isMe ? Colors.white70 : Colors.grey),
                                     ),
                                   ),
                                 ],
-                                
-                                const SizedBox(height: 4),
-                                Align(
-                                  alignment: Alignment.bottomRight,
-                                  child: Text(
-                                    DateFormat('HH:mm').format(msg.createdAt),
-                                    style: TextStyle(fontSize: 10, color: isMe ? Colors.white70 : Colors.grey),
+                              ),
+                              
+                              // 👇 Menu de suppression (bouton 3 points)
+                              if (canDelete)
+                                Positioned(
+                                  top: -8, right: -8,
+                                  child: PopupMenuButton<String>(
+                                    icon: Icon(Icons.more_vert, size: 16, color: isMe ? Colors.white70 : Colors.grey),
+                                    padding: EdgeInsets.zero,
+                                    onSelected: (val) {
+                                      if (val == 'delete') _deleteMessage(msg);
+                                    },
+                                    itemBuilder: (ctx) => [
+                                      const PopupMenuItem(value: 'delete', child: Row(children: [Icon(Icons.delete, size: 18, color: AppColors.secondary), SizedBox(width: 8), Text('Supprimer')])),
+                                    ],
                                   ),
                                 ),
-                              ],
-                            ),
+                            ],
                           ),
                         ),
                       );
@@ -229,7 +230,6 @@ class _ChatScreenState extends State<ChatScreen> {
                   ),
           ),
           
-          // Zone de saisie
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
             decoration: BoxDecoration(
@@ -238,11 +238,7 @@ class _ChatScreenState extends State<ChatScreen> {
             ),
             child: Row(
               children: [
-                IconButton(
-                  icon: const Icon(Icons.attach_file, color: AppColors.primary),
-                  onPressed: _pickFile,
-                  tooltip: 'Envoyer un fichier',
-                ),
+                IconButton(icon: const Icon(Icons.attach_file, color: AppColors.primary), onPressed: _pickFile),
                 Expanded(
                   child: TextField(
                     controller: _textController,
@@ -260,10 +256,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 const SizedBox(width: 8),
                 CircleAvatar(
                   backgroundColor: AppColors.primary,
-                  child: IconButton(
-                    icon: const Icon(Icons.send, color: Colors.white, size: 20),
-                    onPressed: _sendText,
-                  ),
+                  child: IconButton(icon: const Icon(Icons.send, color: Colors.white, size: 20), onPressed: _sendText),
                 ),
               ],
             ),

@@ -779,4 +779,12 @@ class ApiService {
     _parseResponse(response);
   }
 
+  Future<int> getUnreadMessageCount() async {
+    final response = await http.get(
+      Uri.parse('${ApiConfig.baseUrl}/messages/unread-count'),
+      headers: await _headers(),
+    ).timeout(ApiConfig.requestTimeout);
+    final json = _parseResponse(response);
+    return json['count'] ?? 0;
+  }
 }

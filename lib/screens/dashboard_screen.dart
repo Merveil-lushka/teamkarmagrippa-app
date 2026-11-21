@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:material_ui/material_ui.dart';
 import 'package:provider/provider.dart';
 
@@ -27,6 +29,8 @@ class DashboardScreen extends StatefulWidget {
 class _DashboardScreenState extends State<DashboardScreen> {
   int _selectedIndex = 0;
   final ApiService _api = ApiService();
+  int _unreadChatCount = 0;
+  Timer? _chatTimer;
 
   bool _isStatsLoading = true;
   int _dossiersCount = 0;
@@ -37,6 +41,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
   void initState() {
     super.initState();
     _loadStats();
+    _chatTimer = Timer.periodic(const Duration(seconds: 5), (_) async {
+      try {
+        final count = await _api.getUnreadMessageCount();
+        if (mounted) setState(() => _unreadChatCount = count);
+      } catch (_) {}
+    });
+  }
+
+  @override
+  void dispose() {
+    _chatTimer?.cancel();
+    super.dispose();
   }
 
   Future<void> _loadStats() async {
@@ -165,11 +181,41 @@ class _DashboardScreenState extends State<DashboardScreen> {
             _buildMenuTile(icon: Icons.public, label: 'Publications', index: 3),
             const Divider(),
             ListTile(
-              leading: const Icon(Icons.chat, color: AppColors.primary),
+              leading: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  const Icon(Icons.chat, color: AppColors.primary),
+                  if (_unreadChatCount > 0)
+                    Positioned(
+                      right: -6,
+                      top: -6,
+                      child: Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: const BoxDecoration(
+                          color: AppColors.secondary,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Text(
+                          '$_unreadChatCount',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
               title: const Text('Chat d\'équipe'),
               onTap: () {
                 Navigator.pop(context);
-                Navigator.push(context, MaterialPageRoute(builder: (_) => const ChatScreen()));
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const ChatScreen()),
+                ).then((_) {
+                  setState(() => _unreadChatCount = 0);
+                });
               },
             ),
 
