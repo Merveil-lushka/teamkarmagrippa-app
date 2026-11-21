@@ -11,6 +11,7 @@ import '../models/user.dart';
 import '../models/dossier.dart';
 import '../models/document.dart';
 import '../models/comment.dart';
+import '../models/message.dart';
 
 class ApiException implements Exception {
   final String message;
@@ -725,6 +726,57 @@ class ApiService {
 
     final json = _parseResponse(response);
     return json['data'] as Map<String, dynamic>? ?? {};
+  }
+
+  Future<List<ChatMessage>> getMessages() async {
+    final response = await http.get(
+      Uri.parse('${ApiConfig.baseUrl}/messages'),
+      headers: await _headers(),
+    ).timeout(ApiConfig.requestTimeout);
+    final json = _parseResponse(response);
+    final list = (json['data'] as List? ?? []);
+    return list
+        .map((e) => ChatMessage.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<ChatMessage> sendMessage(String text) async {
+    final response = await http.post(
+      Uri.parse('${ApiConfig.baseUrl}/messages'),
+      headers: await _headers(),
+      body: jsonEncode({'text': text}),
+    ).timeout(ApiConfig.requestTimeout);
+    final json = _parseResponse(response);
+    return ChatMessage.fromJson(json['data']);
+  }
+
+  Future<ChatMessage> sendMessageFile(File file, String fileName) async {
+    final request = http.MultipartRequest(
+      'POST',
+      Uri.parse('${ApiConfig.baseUrl}/messages/file'),
+    );
+    final token = await getToken();
+    if (token != null) request.headers['Authorization'] = 'Bearer $token';
+    request.files.add(
+      await http.MultipartFile.fromPath(
+        'fichier',
+        file.path,
+        filename: fileName,
+      ),
+    );
+    final streamedResponse = await request.send()
+        .timeout(ApiConfig.uploadTimeout);
+    final response = await http.Response.fromStream(streamedResponse);
+    final json = _parseResponse(response);
+    return ChatMessage.fromJson(json['data']);
+  }
+
+  Future<void> deleteMessage(String id) async {
+    final response = await http.delete(
+      Uri.parse('${ApiConfig.baseUrl}/messages/$id'),
+      headers: await _headers(),
+    ).timeout(ApiConfig.requestTimeout);
+    _parseResponse(response);
   }
 
 }

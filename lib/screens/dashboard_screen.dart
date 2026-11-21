@@ -15,6 +15,7 @@ import 'profile_screen.dart';
 import 'login_screen.dart';
 import 'create_document_screen.dart'; // 👈 Import ajouté
 import 'notifications_screen.dart';
+import 'chat_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -162,6 +163,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ],
 
             _buildMenuTile(icon: Icons.public, label: 'Publications', index: 3),
+            const Divider(),
+            ListTile(
+              leading: const Icon(Icons.chat, color: AppColors.primary),
+              title: const Text('Chat d\'équipe'),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(context, MaterialPageRoute(builder: (_) => const ChatScreen()));
+              },
+            ),
 
             if (auth.isAdmin) ...[
               const Divider(),
