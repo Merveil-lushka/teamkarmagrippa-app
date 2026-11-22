@@ -42,16 +42,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Future<void> _pickAndUploadImage() async {
     try {
-      final result = await FilePicker.pickFiles(type: FileType.image, withData: true);
+      // 👇 On retire 'withData: true' d'ici
+      final result = await FilePicker.pickFiles(type: FileType.image);
+      
       if (result == null || result.isEmpty) return;
 
       final platformFile = result.first;
+      
+      // 👇 On lit les bytes manuellement
+      final bytes = await platformFile.readAsBytes();
+      
       File? file;
       if (platformFile.path != null) file = File(platformFile.path!);
 
       setState(() => _isLoading = true);
       
-      final updatedUser = await _api.updateProfilePicture(file, platformFile.bytes, platformFile.name);
+      // On passe bien 'file', 'bytes' et 'platformFile.name'
+      final updatedUser = await _api.updateProfilePicture(file, bytes, platformFile.name);
       
       if (mounted) {
         context.read<AuthProvider>().updateUserData(updatedUser);
