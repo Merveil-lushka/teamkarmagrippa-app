@@ -8,6 +8,7 @@ class User {
   final bool actif;
   final bool canPublish;
   final String? token;
+  final String? profilePicture;
 
   User({
     required this.id,
@@ -19,6 +20,7 @@ class User {
     required this.actif,
     required this.canPublish,
     this.token,
+    this.profilePicture,
   });
 
   factory User.fromJson(Map<String, dynamic> json) {
@@ -32,6 +34,7 @@ class User {
       actif: json['actif'] ?? true,
       canPublish: json['canPublish'] ?? false,
       token: json['token'],
+      profilePicture: json['profilePicture'],
     );
   }
 
@@ -46,6 +49,7 @@ class User {
       'actif': actif,
       'canPublish': canPublish,
       if (token != null) 'token': token,
+      if (profilePicture != null) 'profilePicture': profilePicture,
     };
   }
 

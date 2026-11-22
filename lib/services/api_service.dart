@@ -205,6 +205,51 @@ class ApiService {
     return updatedUser;
   }
 
+  Future<User> updateProfilePicture(
+    File? file,
+    Uint8List? fileBytes,
+    String fileName,
+  ) async {
+    final request = http.MultipartRequest(
+      'PUT',
+      Uri.parse(ApiConfig.authMe),
+    );
+
+    final token = await getToken();
+    if (token != null) request.headers['Authorization'] = 'Bearer $token';
+
+    if (fileBytes != null) {
+      request.files.add(
+        http.MultipartFile.fromBytes(
+          'profilePicture',
+          fileBytes,
+          filename: fileName,
+          contentType: _getMediaType(fileName),
+        ),
+      );
+    } else if (file != null) {
+      request.files.add(
+        await http.MultipartFile.fromPath(
+          'profilePicture',
+          file.path,
+          filename: fileName,
+          contentType: _getMediaType(fileName),
+        ),
+      );
+    } else {
+      throw ApiException('Aucun fichier fourni');
+    }
+
+    final streamedResponse = await request.send()
+        .timeout(ApiConfig.uploadTimeout);
+    final response = await http.Response.fromStream(streamedResponse);
+    final json = _parseResponse(response);
+
+    final updatedUser = User.fromJson(json['data']);
+    await saveUser(updatedUser);
+    return updatedUser;
+  }
+
   // =====================================================
   // DOSSIERS
   // =====================================================

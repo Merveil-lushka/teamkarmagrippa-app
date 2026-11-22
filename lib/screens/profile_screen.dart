@@ -1,3 +1,6 @@
+import 'dart:io';
+import 'dart:typed_data';
+import 'package:file_picker/file_picker.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:provider/provider.dart';
 
@@ -37,6 +40,36 @@ class _ProfileScreenState extends State<ProfileScreen> {
     super.dispose();
   }
 
+  Future<void> _pickAndUploadImage() async {
+    try {
+      final result = await FilePicker.pickFiles(type: FileType.image, withData: true);
+      if (result == null || result.isEmpty) return;
+
+      final platformFile = result.first;
+      File? file;
+      if (platformFile.path != null) file = File(platformFile.path!);
+
+      setState(() => _isLoading = true);
+      
+      final updatedUser = await _api.updateProfilePicture(file, platformFile.bytes, platformFile.name);
+      
+      if (mounted) {
+        context.read<AuthProvider>().updateUserData(updatedUser);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Photo de profil mise à jour !'), backgroundColor: AppColors.success),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erreur : $e'), backgroundColor: AppColors.secondary),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
   Future<void> _saveProfile() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _isLoading = true);
@@ -48,7 +81,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
         password: _passwordController.text.isNotEmpty ? _passwordController.text : null,
       );
       
-      // Mettre à jour l'état global
       if (mounted) {
         context.read<AuthProvider>().updateUserData(updatedUser);
         ScaffoldMessenger.of(context).showSnackBar(
@@ -86,14 +118,41 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
+                      // 👇 AVATAR CLIQUABLE
                       Center(
-                        child: CircleAvatar(
-                          radius: 50,
-                          backgroundColor: AppColors.primary.withValues(alpha: 0.1),
-                          child: Text(
-                            user?.prenom.isNotEmpty == true ? user!.prenom[0].toUpperCase() : '?',
-                            style: const TextStyle(fontSize: 40, fontWeight: FontWeight.bold, color: AppColors.primary),
-                          ),
+                        child: Stack(
+                          children: [
+                            CircleAvatar(
+                              radius: 60,
+                              backgroundColor: AppColors.primary.withValues(alpha: 0.1),
+                              backgroundImage: user?.profilePicture != null 
+                                  ? NetworkImage(user!.profilePicture!) 
+                                  : null,
+                              child: user?.profilePicture == null
+                                  ? Text(
+                                      user?.prenom.isNotEmpty == true ? user!.prenom[0].toUpperCase() : '?',
+                                      style: const TextStyle(fontSize: 40, fontWeight: FontWeight.bold, color: AppColors.primary),
+                                    )
+                                  : null,
+                            ),
+                            Positioned(
+                              bottom: 0,
+                              right: 0,
+                              child: GestureDetector(
+                                onTap: _pickAndUploadImage,
+                                child: Container(
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: const BoxDecoration(
+                                    color: AppColors.primary,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: _isLoading 
+                                      ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                                      : const Icon(Icons.camera_alt, color: Colors.white, size: 20),
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                       const SizedBox(height: 16),
@@ -106,9 +165,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ),
                       const SizedBox(height: 32),
                       
-                      const Text('Email (non modifiable)', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
+                      const Text('Code Agent (non modifiable)', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
                       const SizedBox(height: 4),
-                      Text(user?.email ?? '', style: const TextStyle(fontSize: 16)),
+                      Text(user?.agentCode ?? '', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                       const SizedBox(height: 24),
 
                       TextFormField(

@@ -13,7 +13,7 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _agentCodeController = TextEditingController(); // 👈 Renommé
+  final _agentCodeController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
 
@@ -61,10 +61,11 @@ class _LoginScreenState extends State<LoginScreen> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Icon(
-                      Icons.cloud_queue,
-                      size: 80,
-                      color: isDark ? AppColors.primaryLight : AppColors.primary,
+                    // 👇 LE NOUVEAU LOGO EST ICI
+                    Image.asset(
+                      'assets/images/iconelogo.png',
+                      height: 120,
+                      fit: BoxFit.contain,
                     ),
                     const SizedBox(height: 16),
                     Text(
@@ -87,7 +88,6 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     const SizedBox(height: 40),
 
-                    // 👇 Champ Code Agent
                     TextFormField(
                       controller: _agentCodeController,
                       keyboardType: TextInputType.text,
@@ -103,7 +103,6 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     const SizedBox(height: 16),
 
-                    // ── Mot de passe ──
                     TextFormField(
                       controller: _passwordController,
                       obscureText: _obscurePassword,
@@ -113,18 +112,11 @@ class _LoginScreenState extends State<LoginScreen> {
                         labelText: 'Mot de passe',
                         prefixIcon: const Icon(Icons.lock_outline),
                         suffixIcon: IconButton(
-                          icon: Icon(_obscurePassword
-                              ? Icons.visibility_off
-                              : Icons.visibility),
-                          onPressed: () {
-                            setState(() => _obscurePassword = !_obscurePassword);
-                          },
+                          icon: Icon(_obscurePassword ? Icons.visibility_off : Icons.visibility),
+                          onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
                         ),
                       ),
-                      validator: (v) {
-                        if (v == null || v.isEmpty) return 'Mot de passe requis';
-                        return null;
-                      },
+                      validator: (v) => v == null || v.isEmpty ? 'Mot de passe requis' : null,
                     ),
                     const SizedBox(height: 12),
 
@@ -141,10 +133,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             const Icon(Icons.error_outline, color: AppColors.secondary, size: 20),
                             const SizedBox(width: 8),
                             Expanded(
-                              child: Text(
-                                auth.error!,
-                                style: const TextStyle(color: AppColors.secondary, fontSize: 14),
-                              ),
+                              child: Text(auth.error!, style: const TextStyle(color: AppColors.secondary, fontSize: 14)),
                             ),
                           ],
                         ),
@@ -154,25 +143,14 @@ class _LoginScreenState extends State<LoginScreen> {
                     ElevatedButton(
                       onPressed: auth.loading ? null : _submit,
                       child: auth.loading
-                          ? const SizedBox(
-                              height: 20,
-                              width: 20,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Colors.white,
-                              ),
-                            )
+                          ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                           : const Text('Se connecter'),
                     ),
                     const SizedBox(height: 24),
-
                     Text(
                       '© ${DateTime.now().year} TeamKarmagrippa',
                       textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: isDark ? Colors.grey.shade600 : Colors.grey.shade500,
-                      ),
+                      style: TextStyle(fontSize: 12, color: isDark ? Colors.grey.shade600 : Colors.grey.shade500),
                     ),
                   ],
                 ),
