@@ -6,6 +6,7 @@ import '../models/document.dart';
 import '../services/api_service.dart';
 import '../theme/app_theme.dart';
 import '../config/api_config.dart';
+import '../utils/share_helper.dart';
 import 'upload_document_screen.dart';
 import 'edit_document_screen.dart';
 
@@ -385,7 +386,7 @@ class _DossierDetailScreenState extends State<DossierDetailScreen> {
                         padding: EdgeInsets.zero,
                         icon: const Icon(Icons.more_vert, size: 20),
                         onSelected: (value) {
-                          // 👇 Ajout de la gestion des propriétés
+                          if (value == 'share') ShareHelper.shareDocument(doc);
                           if (value == 'props') _showFileProperties(doc);
                           if (value == 'edit') _editFile(doc);
                           if (value == 'delete') _deleteFile(doc);
@@ -424,9 +425,9 @@ class _DossierDetailScreenState extends State<DossierDetailScreen> {
     return Colors.grey;
   }
 
-  // 👇 Mise à jour du menu pour inclure Propriétés
   List<PopupMenuEntry<String>> _buildMenuItems(Document doc) {
     return [
+      const PopupMenuItem(value: 'share', child: Row(children: [Icon(Icons.share, size: 20), SizedBox(width: 8), Text('Partager')])),
       const PopupMenuItem(value: 'props', child: Row(children: [Icon(Icons.info_outline, size: 20), SizedBox(width: 8), Text('Propriétés')])),
       const PopupMenuItem(value: 'edit', child: Row(children: [Icon(Icons.edit, size: 20), SizedBox(width: 8), Text('Modifier')])),
       PopupMenuItem(
@@ -472,7 +473,7 @@ class _DossierDetailScreenState extends State<DossierDetailScreen> {
               ),
             PopupMenuButton<String>(
               onSelected: (value) {
-                // 👇 Ajout de la gestion des propriétés
+                if (value == 'share') ShareHelper.shareDocument(doc);
                 if (value == 'props') _showFileProperties(doc);
                 if (value == 'edit') _editFile(doc);
                 if (value == 'delete') _deleteFile(doc);

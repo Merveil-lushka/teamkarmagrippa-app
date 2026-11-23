@@ -6,6 +6,8 @@ import '../models/document.dart';
 import '../services/api_service.dart';
 import '../theme/app_theme.dart';
 import '../config/api_config.dart';
+import '../widgets/file_preview.dart';
+import '../utils/share_helper.dart';
 import 'edit_document_screen.dart'; 
 
 class DocumentsScreen extends StatefulWidget {
@@ -107,6 +109,18 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
       MaterialPageRoute(builder: (_) => EditDocumentScreen(document: doc)),
     );
     if (result == true) _loadDocuments();
+  }
+
+  Future<void> _shareFile(Document doc) async {
+    try {
+      await ShareHelper.shareDocument(doc);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erreur : $e'), backgroundColor: AppColors.secondary),
+        );
+      }
+    }
   }
 
   void _showFilters() {
@@ -215,9 +229,9 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
     );
   }
 
-  // 👇 Menu d'actions réutilisable (avec Publier)
   List<PopupMenuEntry<String>> _buildMenuItems(Document doc) {
     return [
+      const PopupMenuItem(value: 'share', child: Row(children: [Icon(Icons.share, size: 20), SizedBox(width: 8), Text('Partager')])),
       const PopupMenuItem(value: 'edit', child: Row(children: [Icon(Icons.edit, size: 20), SizedBox(width: 8), Text('Modifier')])),
       PopupMenuItem(
         value: 'publish',
@@ -285,7 +299,7 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
           margin: const EdgeInsets.only(bottom: 8),
           child: ListTile(
             onTap: () => _openFile(doc),
-            leading: Icon(_getFileIcon(doc.type), color: _getFileColor(doc.type), size: 36),
+            leading: FilePreview(doc: doc, size: 45),
             title: Text(doc.nom, style: const TextStyle(fontWeight: FontWeight.bold)),
             subtitle: Text('${doc.fichier.tailleLisible} • ${DateFormat('dd/MM/yyyy').format(doc.dateDocument)}'),
             trailing: Row(
@@ -298,8 +312,9 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
                   ),
                 PopupMenuButton<String>(
                   onSelected: (val) {
+                    if (val == 'share') ShareHelper.shareDocument(doc);
                     if (val == 'edit') _editFile(doc);
-                    if (val == 'publish') _togglePublish(doc); // 👈 Action ajoutée
+                    if (val == 'publish') _togglePublish(doc);
                   },
                   itemBuilder: (ctx) => _buildMenuItems(doc),
                 ),
@@ -314,7 +329,7 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
   Widget _buildGridView() {
     return GridView.builder(
       padding: const EdgeInsets.symmetric(horizontal: 16),
-      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(maxCrossAxisExtent: 220, crossAxisSpacing: 12, mainAxisSpacing: 12, childAspectRatio: 0.9),
+      gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(maxCrossAxisExtent: 220, crossAxisSpacing: 12, mainAxisSpacing: 12, childAspectRatio: 0.85),
       itemCount: _documents.length,
       itemBuilder: (context, index) {
         final doc = _documents[index];
@@ -329,7 +344,7 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(_getFileIcon(doc.type), color: _getFileColor(doc.type), size: 48),
+                      FilePreview(doc: doc, isGridView: true),
                       const SizedBox(height: 12),
                       Text(doc.nom, textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                       const SizedBox(height: 4),
@@ -348,8 +363,9 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
                 child: PopupMenuButton<String>(
                   icon: const Icon(Icons.more_vert, size: 20),
                   onSelected: (val) {
+                    if (val == 'share') ShareHelper.shareDocument(doc);
                     if (val == 'edit') _editFile(doc);
-                    if (val == 'publish') _togglePublish(doc); // 👈 Action ajoutée
+                    if (val == 'publish') _togglePublish(doc);
                   },
                   itemBuilder: (ctx) => _buildMenuItems(doc),
                 ),

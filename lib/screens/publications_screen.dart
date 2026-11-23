@@ -7,6 +7,8 @@ import '../services/api_service.dart';
 import '../theme/app_theme.dart';
 import '../config/api_config.dart';
 import 'publication_detail_screen.dart';
+import '../widgets/file_preview.dart'; // 👈 Import du widget pour les miniatures
+import '../utils/share_helper.dart';
 
 class PublicationsScreen extends StatefulWidget {
   const PublicationsScreen({super.key});
@@ -23,8 +25,12 @@ class _PublicationsScreenState extends State<PublicationsScreen> {
   bool _isLoading = true;
   String? _error;
   bool _isGridView = false;
+  Map<String, dynamic> _unreadCounts = {};
+
+  // 👇 Nouveaux filtres
   String? _selectedType;
-  Map<String, dynamic> _unreadCounts = {}; // 👈 Stocke les badges
+  int? _selectedMois;
+  int? _selectedAnnee;
 
   @override
   void initState() {
@@ -45,11 +51,14 @@ class _PublicationsScreenState extends State<PublicationsScreen> {
     });
 
     try {
+      // 👇 On passe les nouveaux filtres à l'API
       final docs = await _api.listPublications(
         type: _selectedType,
+        mois: _selectedMois,
+        annee: _selectedAnnee,
         q: _searchController.text.trim().isEmpty ? null : _searchController.text.trim(),
       );
-      // 👇 On récupère les compteurs de messages non lus
+      
       final counts = await _api.getUnreadCommentCounts();
       
       if (mounted) {
@@ -92,12 +101,14 @@ class _PublicationsScreenState extends State<PublicationsScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => PublicationDetailScreen(document: doc)),
-    ).then((_) => _loadPublications()); // 👈 Recharge les compteurs au retour
+    ).then((_) => _loadPublications());
   }
 
+  // 👇 NOUVELLE FENÊTRE DE FILTRES COMPLÈTE
   void _showFilters() {
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (ctx) {
         return StatefulBuilder(
@@ -111,6 +122,7 @@ class _PublicationsScreenState extends State<PublicationsScreen> {
                   const Text('Filtrer les publications', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 16),
                   
+                  // Type
                   DropdownButtonFormField<String>(
                     value: _selectedType,
                     decoration: const InputDecoration(labelText: 'Type de document'),
@@ -122,13 +134,49 @@ class _PublicationsScreenState extends State<PublicationsScreen> {
                     ],
                     onChanged: (v) => setModalState(() => _selectedType = v),
                   ),
+                  const SizedBox(height: 12),
+
+                  // Mois
+                  DropdownButtonFormField<int>(
+                    value: _selectedMois,
+                    decoration: const InputDecoration(labelText: 'Mois'),
+                    items: [
+                      const DropdownMenuItem(value: null, child: Text('Tous les mois')),
+                      ...List.generate(12, (i) => DropdownMenuItem(
+                        value: i + 1, 
+                        child: Text(DateFormat('MMMM', 'fr').format(DateTime(2024, i + 1)))
+                      )),
+                    ],
+                    onChanged: (v) => setModalState(() => _selectedMois = v),
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Année
+                  DropdownButtonFormField<int>(
+                    value: _selectedAnnee,
+                    decoration: const InputDecoration(labelText: 'Année'),
+                    items: [
+                      const DropdownMenuItem(value: null, child: Text('Toutes les années')),
+                      ...List.generate(5, (i) => DropdownMenuItem(
+                        value: DateTime.now().year - i, 
+                        child: Text('${DateTime.now().year - i}')
+                      )),
+                    ],
+                    onChanged: (v) => setModalState(() => _selectedAnnee = v),
+                  ),
                   const SizedBox(height: 24),
 
                   Row(
                     children: [
                       Expanded(
                         child: OutlinedButton(
-                          onPressed: () => setModalState(() => _selectedType = null),
+                          onPressed: () {
+                            setModalState(() {
+                              _selectedType = null;
+                              _selectedMois = null;
+                              _selectedAnnee = null;
+                            });
+                          },
                           child: const Text('Réinitialiser'),
                         ),
                       ),
@@ -193,7 +241,7 @@ class _PublicationsScreenState extends State<PublicationsScreen> {
                               children: [
                                 Icon(Icons.public_off, size: 64, color: Colors.grey.shade400),
                                 const SizedBox(height: 16),
-                                const Text('Aucune publication pour le moment.'),
+                                const Text('Aucune publication trouvée.'),
                               ],
                             ),
                           )
@@ -210,19 +258,25 @@ class _PublicationsScreenState extends State<PublicationsScreen> {
       itemCount: _documents.length,
       itemBuilder: (context, index) {
         final doc = _documents[index];
-        final unreadCount = _unreadCounts[doc.id] ?? 0; // 👈 Récupère le badge
+        final unreadCount = _unreadCounts[doc.id] ?? 0;
         
         return Card(
           margin: const EdgeInsets.only(bottom: 8),
           child: ListTile(
             onTap: () => _openFile(doc),
-            leading: Icon(_getFileIcon(doc.type), color: _getFileColor(doc.type), size: 36),
+            // 👇 Utilisation de FilePreview (Miniature)
+            leading: FilePreview(doc: doc, size: 45),
             title: Text(doc.nom, style: const TextStyle(fontWeight: FontWeight.bold)),
             subtitle: Text('${doc.fichier.tailleLisible} • ${DateFormat('dd/MM/yyyy').format(doc.dateDocument)}\nPublié par : ${doc.ownerName}'),
             isThreeLine: true,
             trailing: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
+                IconButton(
+                  icon: const Icon(Icons.share, color: AppColors.primary),
+                  tooltip: 'Partager',
+                  onPressed: () => ShareHelper.shareDocument(doc),
+                ),
                 IconButton(
                   icon: const Icon(Icons.visibility, color: AppColors.primary),
                   tooltip: 'Lire le fichier',
@@ -235,7 +289,6 @@ class _PublicationsScreenState extends State<PublicationsScreen> {
                       tooltip: 'Voir les commentaires',
                       onPressed: () => _openDetail(doc),
                     ),
-                    // 👇 LE BADGE ROUGE
                     if (unreadCount > 0)
                       Positioned(
                         right: 6, top: 6,
@@ -267,7 +320,7 @@ class _PublicationsScreenState extends State<PublicationsScreen> {
       itemCount: _documents.length,
       itemBuilder: (context, index) {
         final doc = _documents[index];
-        final unreadCount = _unreadCounts[doc.id] ?? 0; // 👈 Récupère le badge
+        final unreadCount = _unreadCounts[doc.id] ?? 0;
         
         return Card(
           child: InkWell(
@@ -278,7 +331,8 @@ class _PublicationsScreenState extends State<PublicationsScreen> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(_getFileIcon(doc.type), color: _getFileColor(doc.type), size: 48),
+                  // 👇 Utilisation de FilePreview (Miniature)
+                  FilePreview(doc: doc, isGridView: true),
                   const SizedBox(height: 12),
                   Text(doc.nom, textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                   const SizedBox(height: 4),
@@ -292,7 +346,6 @@ class _PublicationsScreenState extends State<PublicationsScreen> {
                       Stack(
                         children: [
                           IconButton(icon: const Icon(Icons.chat_bubble_outline, color: AppColors.primary), onPressed: () => _openDetail(doc), padding: EdgeInsets.zero, constraints: const BoxConstraints()),
-                          // 👇 LE BADGE ROUGE (Vue Grille)
                           if (unreadCount > 0)
                             Positioned(
                               right: 0, top: 0,
@@ -313,25 +366,5 @@ class _PublicationsScreenState extends State<PublicationsScreen> {
         );
       },
     );
-  }
-
-  IconData _getFileIcon(String type) {
-    if (type == 'devis' || type == 'facture' || type == 'pdf') return Icons.picture_as_pdf;
-    if (type == 'photo') return Icons.image;
-    if (type == 'video') return Icons.video_file;
-    if (type == 'audio') return Icons.audio_file;
-    if (type == 'archive') return Icons.folder_zip;
-    if (type == 'document') return Icons.description;
-    return Icons.insert_drive_file;
-  }
-
-  Color _getFileColor(String type) {
-    if (type == 'devis' || type == 'facture' || type == 'pdf') return Colors.red;
-    if (type == 'photo') return Colors.orange;
-    if (type == 'video') return Colors.purple;
-    if (type == 'audio') return Colors.teal;
-    if (type == 'archive') return Colors.brown;
-    if (type == 'document') return Colors.blue;
-    return Colors.grey;
   }
 }
