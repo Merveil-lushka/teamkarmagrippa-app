@@ -257,6 +257,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   'assets/images/dashoard.png',
                   fit: BoxFit.cover,
                 ),
+                // Voile sombre pour assombrir légèrement la photo
+                Container(
+                  color: Colors.black.withValues(alpha: 0.3),
+                ),
                 // Le texte placé à DROITE (sur l'espace bleu)
                 Align(
                   alignment: const Alignment(0.9, -0.15),
@@ -268,21 +272,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         'Bienvenue,\n${user.prenom} !',
                         textAlign: TextAlign.center,
                         style: const TextStyle(
-                          fontSize: 48,
+                          fontSize: 36,
                           fontWeight: FontWeight.bold,
                           color: Colors.white,
-                          height: 1.2,
+                          height: 1.05,
                         ),
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 10),
                       Text(
                         'Consulter et gérer vos projets\navec toute simplicité.',
                         textAlign: TextAlign.center,
                         style: const TextStyle(
-                          fontSize: 23,
+                          fontSize: 17,
                           color: Colors.white,
                           fontWeight: FontWeight.w500,
-                          height: 1.4,
+                          height: 1.2,
                         ),
                       ),
                     ],

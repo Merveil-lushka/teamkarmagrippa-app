@@ -1,5 +1,9 @@
+import 'dart:io' show Platform;
+
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:material_ui/material_ui.dart';
 import 'package:provider/provider.dart';
+import 'package:pwa_install/pwa_install.dart';
 import '../providers/auth_provider.dart';
 import '../theme/app_theme.dart';
 import 'dashboard_screen.dart';
@@ -16,6 +20,14 @@ class _LoginScreenState extends State<LoginScreen> {
   final _agentCodeController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
+
+  @override
+  void initState() {
+    super.initState();
+    if (kIsWeb) PWAInstall().setup(installCallback: () {
+      print('PWA Install prompt affiché');
+    });
+  }
 
   @override
   void dispose() {
@@ -146,6 +158,24 @@ class _LoginScreenState extends State<LoginScreen> {
                           ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                           : const Text('Se connecter'),
                     ),
+                    const SizedBox(height: 24),
+                    if (kIsWeb)
+                      OutlinedButton.icon(
+                        onPressed: () {
+                          if (PWAInstall().installPromptEnabled) {
+                            PWAInstall().promptInstall_();
+                          } else {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('L\'installation n\'est pas disponible sur ce navigateur (utilisez Chrome ou Edge).')),
+                            );
+                          }
+                        },
+                        icon: const Icon(Icons.download, color: AppColors.primary),
+                        label: const Text('Installer l\'application sur cet appareil', style: TextStyle(color: AppColors.primary)),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                        ),
+                      ),
                     const SizedBox(height: 24),
                     Text(
                       '© ${DateTime.now().year} TeamKarmagrippa',
